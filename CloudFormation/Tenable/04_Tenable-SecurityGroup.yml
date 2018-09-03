@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "SecurityGroup created"
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Parameters: 
+          - EnvType
+          - BaseNetworkStackName
+Parameters:
+  EnvType:
+    Description: Select Environment Type. Default is dev
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+  BaseNetworkStackName:
+    Description: BaseNetwork Stack Name
+    Type: String
+    Default: Tenable-Test-BaseNetwork
+Mappings:
+  dev:
+    ResourceName:
+      SecurityGroup01: tenable-dev-scanner-sg
+      SecurityGroup02: tenable-dev-target-sg
+Resources:
+  SecurityGroup01:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      VpcId: { "Fn::ImportValue": !Join [ "-", [ "Ref":"BaseNetworkStackName","VPCID"]] }
+      GroupName: !FindInMap [ Ref: EnvType, ResourceName, SecurityGroup01 ]
+      GroupDescription: SecurityGroup for Nessus Scanner
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, ResourceName, SecurityGroup01 ]
+  SecurityGroup02:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      VpcId: { "Fn::ImportValue": !Join [ "-", [ "Ref":"BaseNetworkStackName","VPCID"]] }
+      GroupName: !FindInMap [ Ref: EnvType, ResourceName, SecurityGroup02 ]
+      GroupDescription: SecurityGroup for Tenable Target Host
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          SourceSecurityGroupId: !Ref SecurityGroup01
+        - IpProtocol: udp
+          FromPort: '0'
+          ToPort: '65535'
+          SourceSecurityGroupId: !Ref SecurityGroup01
+        - IpProtocol: icmp
+          FromPort: '-1'
+          ToPort: '-1'
+          SourceSecurityGroupId: !Ref SecurityGroup01
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, ResourceName, SecurityGroup02 ]
+Outputs:
+  OutputSecurityGroup01:
+    Value: !Ref SecurityGroup01
+    Export:
+      Name: !Sub "${AWS::StackName}-SecurityGroup01"
+

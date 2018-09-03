@@ -1,0 +1,44 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "BaseNetwork created"
+Parameters:
+  EnvType:
+    Description: Select Environment Type. Default is dev
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+Mappings:
+  dev:
+    IPAddress:
+      VPCCider: 10.0.0.0/16
+    ResourceName:
+      VPC: tenable-dev-vpc
+      InternetGateway: tenable-dev-igw
+Resources:
+  CreateVPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: !FindInMap [ Ref: EnvType, IPAddress, VPCCider ]
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, ResourceName, VPC ]
+  CreateInternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, ResourceName, InternetGateway ]
+  AttachIGW:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref CreateVPC
+      InternetGatewayId: !Ref CreateInternetGateway
+Outputs:
+  OutputVPC:
+    Value: !Ref CreateVPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCID"
+  OutputInternetGateway:
+    Value: !Ref CreateInternetGateway
+    Export:
+      Name: !Sub "${AWS::StackName}-InternetGatewayID"

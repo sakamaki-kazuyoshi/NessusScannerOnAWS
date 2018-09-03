@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "SharedServices created"
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Parameters: 
+          - EnvType
+          - BaseNetworkStackName
+Parameters:
+  EnvType:
+    Description: Select Environment Type. Default is dev
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+  BaseNetworkStackName:
+    Description: BaseNetwork Stack Name
+    Type: String
+    Default: Stack-Tenable-BaseNetwork
+Mappings:
+  dev:
+    IPAddress:
+      SubnetCider01: 10.0.1.0/24
+      SubnetCider02: 10.0.2.0/24
+    ResourceName:
+      NetworkAclName: tenable-dev-nacl
+      SubnetName01: tenable-dev-public1-subnet
+      SubnetName02: tenable-dev-public2-subnet
+      RouteTableName01: tenable-dev-public-rtb
+Resources:
+  NetworkAcl01:
+    Type: "AWS::EC2::NetworkAcl"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, ResourceName, NetworkAclName ]
+      VpcId: { "Fn::ImportValue": !Join [ "-", [ "Ref":"BaseNetworkStackName","VPCID"]] }
+  NetworkAclEntryEgressTrue:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      NetworkAclId: !Ref NetworkAcl01
+      Protocol: -1
+      RuleAction : allow
+      RuleNumber : 100
+  NetworkAclEntryEgressFalse:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: false
+      NetworkAclId: !Ref NetworkAcl01
+      Protocol: -1
+      RuleAction : allow
+      RuleNumber : 100
+  RouteTable01:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: { "Fn::ImportValue": !Join [ "-", [ "Ref":"BaseNetworkStackName","VPCID"]] }
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, ResourceName, RouteTableName01 ]
+  RouteIGW:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: { "Fn::ImportValue": !Join [ "-", [ "Ref":"BaseNetworkStackName","InternetGatewayID"]] }
+      RouteTableId: !Ref RouteTable01
+  Subnet01:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: { "Fn::ImportValue": !Join [ "-", [ "Ref":"BaseNetworkStackName","VPCID"]] }
+      AvailabilityZone: ap-northeast-1a
+      CidrBlock: !FindInMap [ Ref: EnvType, IPAddress, SubnetCider01 ]
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, ResourceName, SubnetName01 ]
+  Subnet02:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: { "Fn::ImportValue": !Join [ "-", [ "Ref":"BaseNetworkStackName","VPCID"]] }
+      AvailabilityZone: ap-northeast-1c
+      CidrBlock: !FindInMap [ Ref: EnvType, IPAddress, SubnetCider02 ]
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, ResourceName, SubnetName02 ]
+  SubnetRouteTableAssociation01:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref Subnet01
+      RouteTableId: !Ref RouteTable01
+  SubnetNetworkAclAssociation01:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref Subnet01
+      NetworkAclId: !Ref NetworkAcl01
+  SubnetRouteTableAssociation02:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref Subnet02
+      RouteTableId: !Ref RouteTable01
+  SubnetNetworkAclAssociation02:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref Subnet02
+      NetworkAclId: !Ref NetworkAcl01
+Outputs:
+  OutputSubnet01:
+    Value: !Ref Subnet01
+    Export:
+      Name: !Sub "${AWS::StackName}-Subnet01"
+  OutputSubnet02:
+    Value: !Ref Subnet02
+    Export:
+      Name: !Sub "${AWS::StackName}-Subnet02"

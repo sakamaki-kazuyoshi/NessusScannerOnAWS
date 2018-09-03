@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "EC2 created"
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Parameters: 
+          - EnvType
+          - IdentityStackName
+          - SharedServicesStackName
+          - SecurityGroupStackName
+          - LinkingKey
+Parameters:
+  EnvType:
+    Description: Select Environment Type. Default is dev
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+  IdentityStackName:
+    Description: Identity stack name
+    Type: String
+    Default: Tenable-Test-Identity
+  SharedServicesStackName:
+    Description: SharedServices stack name
+    Type: String
+    Default: Tenable-Test-SharedServices
+  SecurityGroupStackName:
+    Description: SecurityGroup stack name
+    Type: String
+    Default: Tenable-Test-SecurityGroup
+  RoleName:
+    Type: String
+    Default: tenable-dev-readonlyaccess
+    AllowedValues:
+      - tenable-dev-readonlyaccess
+  LinkingKey:
+    Description: Nessus Scanners Linking Key
+    Type: String
+    NoEcho: true
+  EC2InstanceType: 
+    Description: "Enter t2.medium, t2.large, m4.large, m4.xlarge, m4.2xlarge, m4.4xlarge, m4.10xlarge, or m4.16xlarge. Default is m4.large"
+    Type: String
+    Default: m4.large
+    AllowedValues:
+      - t2.medium
+      - t2.large
+      - m4.large
+      - m4.xlarge
+      - m4.2xlarge
+      - m4.4xlarge
+      - m4.10xlarge
+      - m4.16xlarge
+Mappings:
+  dev:
+    EC2Config:
+      EC2Name: tenable-dev-scannerserver
+      ImageId: ami-b2ec3dcd #Nessus Scanner (Pre-Authorized)
+      AvailabilityZone: ap-northeast-1a
+Resources:
+  EC201:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      AvailabilityZone: !FindInMap [ Ref: EnvType, EC2Config, AvailabilityZone ]
+      ImageId: !FindInMap [ Ref: EnvType, EC2Config, ImageId ]
+      InstanceType: !Ref EC2InstanceType
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 30
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - { "Fn::ImportValue": !Join [ "-", [ "Ref":"SecurityGroupStackName","SecurityGroup01"]] }
+          SubnetId: { "Fn::ImportValue": !Join [ "-", [ "Ref":"SharedServicesStackName","Subnet01"]] }
+      IamInstanceProfile: { "Fn::ImportValue": !Join [ "-", [ "Ref":"IdentityStackName","IamInstanceProfile1"]] }
+      Tags:
+        - Key: Name
+          Value: !FindInMap [ Ref: EnvType, EC2Config, EC2Name ]
+      UserData:
+        Fn::Base64: !Sub |
+          {
+            "name" : "AWS_Scanner",
+            "key": "${LinkingKey}",
+            "iam_role": "${RoleName}"
+          }
